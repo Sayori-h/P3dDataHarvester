@@ -1,5 +1,5 @@
-// Copyright (c) 2010-2018 Lockheed Martin Corporation. All rights reserved.
-// Use of this file is bound by the PREPAR3D® SOFTWARE DEVELOPER KIT END USER LICENSE AGREEMENT 
+﻿// Copyright(c) 2010 - 2018 Lockheed Martin Corporation.All rights reserved.
+// Use of this file is bound by the PREPAR3D SOFTWARE DEVELOPER KIT END USER LICENSE AGREEMENT 
 //------------------------------------------------------------------------------
 //
 //  SimConnect Data Harvester Sample
@@ -18,10 +18,11 @@
 #include <strsafe.h>
 #include <timeapi.h>
 #include <time.h>
-#include<conio.h>
-#pragma comment(lib,"Winmm.lib")
-
+#include <conio.h>
 #include "SimConnect.h"
+#pragma comment(lib,"Winmm.lib")
+#pragma warning(disable:4996)
+
 int     g_bQuit = 0;
 HANDLE  g_hSimConnect = NULL;
 bool    g_bIsHarvesting = false;
@@ -29,7 +30,6 @@ void setColour(int x) {
 	HANDLE h = GetStdHandle(-11);
 	SetConsoleTextAttribute(h, x);
 }
-
 
 ///////////////////////////////////////////////////
 #define USE_NEW_TIME 1
@@ -172,8 +172,8 @@ struct ObjectData
 	double  dWindY;
 	double  dWindZ;
 	double  dVerSpeed;
-	double  dn1;
-	double  dn2;
+	double  dn1_1;
+	double  dn1_2;
 	double  dwvelocityz;
 	double  dwvelocityx;
 	double  dwvelocityy;
@@ -211,7 +211,7 @@ const PropertyDefinition g_aVariables[] =
 	{ "AILERON LEFT DEFLECTION",           "Radians",			   SIMCONNECT_DATATYPE_FLOAT64     },
 	{ "AILERON RIGHT DEFLECTION",          "Radians",			   SIMCONNECT_DATATYPE_FLOAT64     },
 	{ "AMBIENT WIND DIRECTION",            "Degrees",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT WIND VELOCITY",             "Knots",                SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "AMBIENT WIND VELOCITY",             "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
 	{ "AMBIENT WIND X",                    "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
 	{ "AMBIENT WIND Y",                    "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
 	{ "AMBIENT WIND Z",                    "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
@@ -226,7 +226,7 @@ const PropertyDefinition g_aVariables[] =
 	{ "VELOCITY WORLD Z",                  "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64	   },
 };
 
-double data[10];
+double windPara[10];
 SOCKET socket1;
 struct sockaddr_in server;
 int len = sizeof(server);
@@ -288,7 +288,7 @@ void PrintString(char* pszBuffer, unsigned int cbBuffer, const char* pszValue, b
 			}
 			else
 			{
-				StringCchPrintfA(szTemp, sizeof(szTemp), ",", pszValue);
+				StringCchPrintfA(szTemp, sizeof(szTemp), ",");
 				strcat_s(pszBuffer, cbBuffer, szTemp);
 			}
 		}
@@ -301,7 +301,7 @@ void PrintString(char* pszBuffer, unsigned int cbBuffer, const char* pszValue, b
 			}
 			else
 			{
-				StringCchPrintfA(szTemp, sizeof(szTemp), "\n", pszValue);
+				StringCchPrintfA(szTemp, sizeof(szTemp), "\n");
 				strcat_s(pszBuffer, cbBuffer, szTemp);
 			}
 		}
@@ -437,12 +437,9 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 
 			memcpy(buffer, &sd, sizeof(SendData));
 
-
 			if (sendto(socket1, buffer, sizeof(SendData), 0, (struct sockaddr*)&server, len) != SOCKET_ERROR)
 			{
-
 				printf("回中..\n");
-
 			}
 			// Close the Socket.
 			closesocket(socket1);
@@ -487,15 +484,15 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 
 			if (SUCCEEDED(StringCbLengthA(&pUserData->szTitle[0], sizeof(pUserData->szTitle), NULL))) // security check
 			{
-				data[0] = pUserData->dPitch;
-				data[1] = pUserData->dBank;
-				data[2] = pUserData->dHeading;
-				data[3] = pUserData->dAlpha;
-				data[4] = pUserData->dBeta;
-				data[5] = pUserData->dAirspeed;
-				data[6] = pUserData->dwvelocityz;
-				data[7] = pUserData->dwvelocityx;
-				data[8] = pUserData->dwvelocityy;
+				windPara[0] = pUserData->dPitch;
+				windPara[1] = pUserData->dBank;
+				windPara[2] = pUserData->dHeading;
+				windPara[3] = pUserData->dAlpha;
+				windPara[4] = pUserData->dBeta;
+				windPara[5] = pUserData->dAirspeed;
+				windPara[6] = pUserData->dwvelocityz;
+				windPara[7] = pUserData->dwvelocityx;
+				windPara[8] = pUserData->dwvelocityy;
 #if OUTPUT_WAY 
 				setColour(2);
 				printf("\n %.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f",
@@ -512,6 +509,16 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 #else
 #endif
 			}
+
+			/*sd.pitch_v = pUserData->dR_VelocityX * 30.0f / 3.1415926f * 100;
+			sd.pitch_acc = pUserData->dR_AccelerationX * 2 * 3.1415926f * 100;
+			sd.roll_v = pUserData->dR_VelocityY * 30.0f / 3.1415926f * 100;
+			sd.roll_acc = pUserData->dR_AccelerationY * 2 * 3.1415926f * 100;*/
+
+			sd.pitch_v = 0;
+			sd.pitch_acc = 0;
+			sd.roll_v = 0;
+			sd.roll_acc = 0;
 
 			char* buffer = new char[sizeof(SendData)];
 
@@ -579,14 +586,14 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindY);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindZ);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dVerSpeed);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn1);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn2);
-					GetWindX(szBuffer, sizeof(szBuffer), data[0], data[1], data[2],
-						data[3], data[4], data[5], data[6]);
-					GetWindY(szBuffer, sizeof(szBuffer), data[0], data[1], data[2],
-						data[3], data[4], data[5], data[7]);
-					GetWindZ(szBuffer, sizeof(szBuffer), data[0], data[1], data[2],
-						data[3], data[4], data[5], data[8]);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn1_1);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn1_2);
+					GetWindX(szBuffer, sizeof(szBuffer), windPara[0], windPara[1], windPara[2],
+						windPara[3], windPara[4], windPara[5], windPara[6]);
+					GetWindY(szBuffer, sizeof(szBuffer), windPara[0], windPara[1], windPara[2],
+						windPara[3], windPara[4], windPara[5], windPara[7]);
+					GetWindZ(szBuffer, sizeof(szBuffer), windPara[0], windPara[1], windPara[2],
+						windPara[3], windPara[4], windPara[5], windPara[8]);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dwvelocityx);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dwvelocityy);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dwvelocityz);
@@ -693,7 +700,7 @@ void RunDataHarvester()
 int __cdecl _tmain(int argc, _TCHAR* argv[])
 {
 	printf("input count per second:");
-	scanf("%d", &nCount1Sec);
+	int r=scanf("%d", &nCount1Sec);
 	if (0 >= nCount1Sec)
 	{
 		return 0;
