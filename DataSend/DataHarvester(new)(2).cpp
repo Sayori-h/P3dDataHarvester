@@ -81,7 +81,7 @@ void GetWindY(char* pBuffer, int nBuffertLength, double dPitch, double dBank, do
 	dPitch *= (-1);
 	double dwy = dwvelocityx - dAirspeed * (cos(dAlpha) * cos(dBeta) * sin(dHeading) * cos(dPitch) + \
 		sin(dBeta) * sin(dPitch) * sin(dBank) * sin(dHeading) + sin(dBeta) * cos(dBank) * cos(dHeading) - \
-		cos(dHeading) * sin(dAlpha) * cos(dBeta)*sin(dBank) + cos(dBank) * sin(dPitch) * sin(dHeading) * sin(dAlpha) * cos(dBeta));
+		cos(dHeading) * sin(dAlpha) * cos(dBeta) * sin(dBank) + cos(dBank) * sin(dPitch) * sin(dHeading) * sin(dAlpha) * cos(dBeta));
 	dev_windY = dwy;
 	sprintf_s(szTemp, 128, "%.2lf,", dwy);
 	strcat_s(pBuffer, nBuffertLength, szTemp);
@@ -94,7 +94,7 @@ void GetWindZ(char* pBuffer, int nBuffertLength, double dPitch, double dBank, do
 	char szTemp[128] = { 0 };
 	dPitch *= (-1);
 	double dwz = dwvelocityy - dAirspeed * (sin(dAlpha) * cos(dBeta) * cos(dPitch) * cos(dBank) - \
-		cos(dAlpha) * sin(dPitch) * cos(dBeta) + sin(dBeta)*sin(dBank)*cos(dPitch));
+		cos(dAlpha) * sin(dPitch) * cos(dBeta) + sin(dBeta) * sin(dBank) * cos(dPitch));
 	dev_windZ = dwz;
 	sprintf_s(szTemp, 128, "%.2lf,", dwz);
 	strcat_s(pBuffer, nBuffertLength, szTemp);
@@ -248,14 +248,27 @@ void PrintHeader()
 
 #else
 #endif
-
-		if (2 == i) { strcat_s(szBuffer, sizeof(szBuffer), "ZULU UTC TIME"); }
-		else if (7 == i) { strcat_s(szBuffer, sizeof(szBuffer), "ZULU DATE"); }
-		else if (29 == i) { strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND X"); }
-		else if (30 == i) { strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND Y"); }
-		else if (31 == i) { strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND Z"); }
-		else { strcat_s(szBuffer, sizeof(szBuffer), prop.pszName); }
-
+		switch (i)
+		{
+		case 2:
+			strcat_s(szBuffer, sizeof(szBuffer), "ZULU UTC TIME");
+			break;
+		case 7:
+			strcat_s(szBuffer, sizeof(szBuffer), "ZULU DATE");
+			break;
+		case 29:
+			strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND X");
+			break;
+		case 30:
+			strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND Y");
+			break;
+		case 31:
+			strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND Z");
+			break;
+		default:
+			strcat_s(szBuffer, sizeof(szBuffer), prop.pszName);
+			break;
+		}
 
 		if (prop.pszUnits)
 		{
@@ -396,14 +409,14 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 			time_t t = time(NULL);
 			struct tm* pTM = localtime(&t);
 
-			sprintf_s(szFileName, 1024, "%04d_%02d_%02d_%02d_%02d_%02drecord.csv", pTM->tm_year + 1900,\
+			sprintf_s(szFileName, 1024, "%04d_%02d_%02d_%02d_%02d_%02drecord.csv", pTM->tm_year + 1900, \
 				pTM->tm_mon + 1, pTM->tm_mday, pTM->tm_hour, pTM->tm_min, pTM->tm_sec);
 
 			fopen_s(&g_pFile, szFileName, "w+");
 			if (!g_pFile)
 			{
 				printf("Failed to open \"%s\". Please ensure the file has the correct permissions and "\
-				"is not being used by another application.", szFileName);
+					"is not being used by another application.", szFileName);
 				break;
 			}
 			printf("\nFile successfully opened!");
@@ -413,7 +426,7 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 			PrintHeader();
 
 			// Per frame data request on the user object.
-			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT,\
+			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT, \
 				SIMCONNECT_OBJECT_ID_USER, SIMCONNECT_PERIOD_VISUAL_FRAME);
 
 			// Update menu items.
@@ -425,7 +438,7 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 		case EVENT_ID_STOP_HARVEST:
 		{
 			// Cancel the data request on the user object.
-			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT,\
+			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT, \
 				SIMCONNECT_OBJECT_ID_USER, SIMCONNECT_PERIOD_NEVER);
 
 			// Update menu items.
@@ -527,7 +540,7 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 			{
 				printf("   sending..\n");
 			}
-			delete []buffer;
+			delete[]buffer;
 
 			if (g_pFile != NULL)
 			{
@@ -539,7 +552,7 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 				{
 					tCurSec = t;
 					nLastMS = 0;
-				}
+		}
 
 				if ((nMS - nLastMS) > nTimeOutMS)
 				{
@@ -599,16 +612,16 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pCont
 
 					strcat_s(szBuffer, sizeof(szBuffer), "\n");
 					fprintf_s(g_pFile, szBuffer);
-				}
-			}
+		}
+	}
 
 			break;
-		}
+	}
 		default:
 		{
 			break;
 		}
-		}
+}
 
 		break; // SIMCONNECT_RECV_ID_SIMOBJECT_DATA
 	}
@@ -699,16 +712,11 @@ void RunDataHarvester()
 int __cdecl _tmain(int argc, _TCHAR* argv[])
 {
 	printf("input count per second:");
-	int r=scanf("%d", &nCount1Sec);
-	if (0 >= nCount1Sec)
-	{
-		return 0;
-	}
-	if (nCount1Sec > 6)
-	{
-		nCount1Sec += 3;
-	}
+	int r = scanf("%d", &nCount1Sec);
+	if (0 >= nCount1Sec)return 0;
+	if (nCount1Sec > 6)nCount1Sec += 3;
 	nTimeOutMS = (int)(1000. / nCount1Sec);
+
 	RunDataHarvester();
 	return 0;
 }
