@@ -104,7 +104,7 @@
     <Image Include="卡通肖像图标免费下载o3-ico_爱给网_aigei_com.ico" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DataHarvester(new)(2).cpp" />
+    <ClCompile Include="DataHarvester.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

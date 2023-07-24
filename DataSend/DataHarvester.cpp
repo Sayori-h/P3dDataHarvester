@@ -1,4 +1,4 @@
-// Copyright (c) 2010-2018 Lockheed Martin Corporation. All rights reserved.
+﻿// Copyright (c) 2010-2018 Lockheed Martin Corporation. All rights reserved.
 // Use of this file is bound by the PREPAR3D® SOFTWARE DEVELOPER KIT END USER LICENSE AGREEMENT 
 //------------------------------------------------------------------------------
 //
@@ -18,7 +18,9 @@
 #include <strsafe.h>
 #include <timeapi.h>
 #include <time.h>
+#include<conio.h>
 #pragma comment(lib,"Winmm.lib")
+#pragma warning(disable:4996)
 
 #include "SimConnect.h"
 int     g_bQuit = 0;
@@ -31,10 +33,10 @@ void setColour(int x) {
 
 
 ///////////////////////////////////////////////////
-
 #define USE_NEW_TIME 1
+#define OUTPUT_WAY 1
 
-
+double dev_windX, dev_windY, dev_windZ;
 // 时:分:秒
 void GetTimeStr(char* pBuffer, int nBuffertLength, double dTime)
 {
@@ -48,6 +50,7 @@ void GetTimeStr(char* pBuffer, int nBuffertLength, double dTime)
 	sprintf_s(szTemp, 128, "%d:%d:%d,", nTime, nMin, nSec);
 	strcat_s(pBuffer, nBuffertLength, szTemp);
 }
+
 //年/月/日
 void GetDateStr(char* pBuffer, int nBuffertLength, int nYear, int nMonth, int nDay)
 {
@@ -56,22 +59,60 @@ void GetDateStr(char* pBuffer, int nBuffertLength, int nYear, int nMonth, int nD
 	strcat_s(pBuffer, nBuffertLength, szTemp);
 }
 
+//windX
+void GetWindX(char* pBuffer, int nBuffertLength, double dPitch, double dBank, double dHeading, double dAlpha,
+	double dBeta, double dAirspeed, double dwvelocityz)
+{
+	char szTemp[128] = { 0 };
+	dPitch *= (-1);
+	double dwx = dwvelocityz - dAirspeed * (cos(dAlpha) * cos(dPitch) * cos(dHeading) * cos(dBeta) + \
+		sin(dBeta) * sin(dPitch) * sin(dBank) * cos(dHeading) - sin(dBeta) * cos(dBank) * sin(dHeading) + \
+		sin(dHeading) * sin(dBank) * sin(dAlpha) * cos(dBeta) + cos(dHeading) * sin(dPitch) * cos(dBank) * sin(dAlpha) * cos(dBeta));
+	dev_windX = dwx;
+	sprintf_s(szTemp, 128, "%.2lf,", dwx);
+	strcat_s(pBuffer, nBuffertLength, szTemp);
+}
+
+//windY
+void GetWindY(char* pBuffer, int nBuffertLength, double dPitch, double dBank, double dHeading, double dAlpha,
+	double dBeta, double dAirspeed, double dwvelocityx)
+{
+	char szTemp[128] = { 0 };
+	dPitch *= (-1);
+	double dwy = dwvelocityx - dAirspeed * (cos(dAlpha) * cos(dBeta) * sin(dHeading) * cos(dPitch) + \
+		sin(dBeta) * sin(dPitch) * sin(dBank) * sin(dHeading) + sin(dBeta) * cos(dBank) * cos(dHeading) - \
+		cos(dHeading) * sin(dAlpha) * cos(dBeta) * sin(dBank) + cos(dBank) * sin(dPitch) * sin(dHeading) * sin(dAlpha) * cos(dBeta));
+	dev_windY = dwy;
+	sprintf_s(szTemp, 128, "%.2lf,", dwy);
+	strcat_s(pBuffer, nBuffertLength, szTemp);
+}
+
+//windZ
+void GetWindZ(char* pBuffer, int nBuffertLength, double dPitch, double dBank, double dHeading, double dAlpha,
+	double dBeta, double dAirspeed, double dwvelocityy)
+{
+	char szTemp[128] = { 0 };
+	dPitch *= (-1);
+	double dwz = dwvelocityy - dAirspeed * (sin(dAlpha) * cos(dBeta) * cos(dPitch) * cos(dBank) - \
+		cos(dAlpha) * sin(dPitch) * cos(dBeta) + sin(dBeta) * sin(dBank) * cos(dPitch));
+	dev_windZ = dwz;
+	sprintf_s(szTemp, 128, "%.2lf,", dwz);
+	strcat_s(pBuffer, nBuffertLength, szTemp);
+}
 
 int nCount1Sec = 100;
 unsigned int nTimeOutMS = 1000 / nCount1Sec;
 time_t tCurSec = 0;
 unsigned int nLastMS = 0;
 
-/////////////////////////////////////////////////////////
-
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 static const char* TITLE_STRING = "Data Harvester";
 static const char* START_STRING = "Start Harvest (SimConnect)";
 static const char* STOP_STRING = "Stop Harvest (SimConnect)";
 
-FILE*   g_pFile = NULL;
+FILE* g_pFile = NULL;
 static const char* OUTPUT_FILE_NAME = "DataHarvester.csv";
-
 
 enum GROUP_ID
 {
@@ -100,7 +141,6 @@ struct SendData
 	int pitch_acc;
 	int roll_v;
 	int roll_acc;
-	int verticalSpeed;
 };
 
 // This struct must align with the sizes and types defined in the table below.
@@ -114,129 +154,118 @@ struct ObjectData
 	int     uYear;
 	int     uMonthOfTheYear;
 	int     uDayOfTheMonth;
-	int     uDayOfTheWeek;
-	int     uTimeZoneOffset;
-	double  dLatitude;
-	double  dLongitude;
-	double  dR_VelocityX;
-	double  dR_VelocityY;
-	double  dR_VelocityZ;
+	double  dHeight;
+	double  dRHeight;
+	double  dGSpeed;
+	double  dAirspeed;
+	double  dMach;
+	double  dWindDirection;
+	double  dWindVelocity;
+	double  dVerSpeed;
+	double  dIndSpeed;
 	double  dPitch;
 	double  dBank;
 	double  dHeading;
-	double  dVerSpeed;
-	//double  dVelocityY;
-	//double  dVelocityZ;
-	//double  dAccelerationX;
-	//double  dAccelerationY;
-	//double  dAccelerationZ;
-	double  dR_AccelerationX;
-	double  dR_AccelerationY;
-	double  dR_AccelerationZ;
+	double  dPressure;
+	double  dLatitude;
+	double  dLongitude;
+	double  dRudder_def;
+	double  dAileron_left;
+	double  dAileron_right;
+	double  dElevator_def;
+	double  dFlapHandle;
+	double  dSpoilL;
+	double  dSpoilR;
+	double  dWeight;
+	double  dn1_2;
+	double  dn1_1;
+	double  dn2_2;
+	double  dn2_1;
 	double  dAlpha;
 	double  dBeta;
-	double  dAirspeed;
-	double  dHeight;
-
-	/*double  dWeight;
-	double  dThrust;
-	double  dAileron_def;
-	double  dElevator_def;
-	double  dRudder_def;
-	double  dE_weight;
-	double  dCG;
-	double  dL_CG;*/
-	/*double  dDynaminPressure;
-	double  dWingArea;
-	double  dWingSpan;
-	double  dBetaDot;*/
-	double  dAirPressure;
-	double  dAirDensity;
-	double  dTemperature;
-	double  dWindDirection;
-	double  dWindVelocity;
+	double  dHDistance;
+	double  dGlideSlope;
+	double  dLoc;
+	double  dYokeY;
+	double  dYokeX;
 	double  dWindX;
 	double  dWindY;
 	double  dWindZ;
-	char  ball;
-	double dengineN1;
-	double dcorrectedengineN11;
-	char correctedengineN12;
+	double  dAirwindx;
+	double  dAirwindy;
+	double  dAirwindz;
+	double  dwvelocityz;
+	double  dwvelocityx;
+	double  dwvelocityy;
 };
 
 struct PropertyDefinition
 {
-	const char*         pszName;
-	const char*         pszUnits;
+	const char* pszName;
+	const char* pszUnits;
 	SIMCONNECT_DATATYPE eDataType;
 };
 
 // This table must align with the sizes and types defined in the struct above.
 const PropertyDefinition g_aVariables[] =
 {
-	{ "TITLE",                      NULL,                   SIMCONNECT_DATATYPE_STRING256   },
-	{ "ABSOLUTE TIME",              "Seconds",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ZULU TIME",                  "Seconds",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "SIM TIME",                   "Seconds",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ZULU DAY OF YEAR",           "Number",               SIMCONNECT_DATATYPE_INT32       },
-	{ "ZULU YEAR",                  "Number",               SIMCONNECT_DATATYPE_INT32       },
-	{ "ZULU MONTH OF YEAR",         "Number",               SIMCONNECT_DATATYPE_INT32       },
-	{ "ZULU DAY OF MONTH",          "Number",               SIMCONNECT_DATATYPE_INT32       },
-	{ "ZULU DAY OF WEEK",           "Number",               SIMCONNECT_DATATYPE_INT32       },
-	{ "TIME ZONE OFFSET",           "Hours",                SIMCONNECT_DATATYPE_INT32       },
-	{ "PLANE LATITUDE",             "Degrees",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "PLANE LONGITUDE",            "Degrees",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ROTATION VELOCITY BODY X",   "Radians per second",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ROTATION VELOCITY BODY Y",   "Radians per second",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ROTATION VELOCITY BODY Z",    "Radians per second",   SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "PLANE PITCH DEGREES",        "Radians",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "PLANE BANK DEGREES",         "Radians",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "PLANE HEADING DEGREES TRUE", "Radians",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "VERTICAL SPEED",             "Feet per second",              SIMCONNECT_DATATYPE_FLOAT64 },
-	/*{ "VELOCITY BODY Z",           "Feet per second",      SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "VELOCITY BODY X",           "Feet per second",      SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "VELOCITY BODY Y",           "Feet per second",      SIMCONNECT_DATATYPE_FLOAT64     },*/
-	/*{ "ACCELERATION BODY X",        "Feet per second squared",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ACCELERATION BODY Y",           "Feet per second squared",            SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ACCELERATION BODY Z",            "Feet per second squared", SIMCONNECT_DATATYPE_FLOAT64     },*/
-	{ "ROTATION ACCELERATION BODY X",      "Radians per second",                SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ROTATION ACCELERATION BODY Y",     "Radians per second",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ROTATION ACCELERATION BODY Z",             "Radians per second",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "INCIDENCE ALPHA",             "Radians",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "INCIDENCE BETA",             "Radians",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AIRSPEED TRUE",            "Knots", SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "PLANE ALTITUDE",      "Feet",                SIMCONNECT_DATATYPE_FLOAT64     },
-
-	/*{ "TOTAL WEIGHT",     "Pounds",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "PROP THRUST:1",     "Pounds",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AILERON AVERAGE DEFLECTION",             "Radians",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "ELEVATOR DEFLECTION",             "Radians",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "RUDDER DEFLECTION",             "Radians",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "EMPTY WEIGHT",            "Pounds", SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "CG PERCENT",      "Percent over 100",                SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "CG PERCENT LATERAL",     "Percent over 100",              SIMCONNECT_DATATYPE_FLOAT64     },*/
-	/*{ "DYNAMIC PRESSURE",     "Pounds per square foot",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "WING AREA",            "Square feet", SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "WING SPAN",      "Feet",                SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "BETA DOT",        "Radians per second",              SIMCONNECT_DATATYPE_FLOAT64     },*/
-	{ "AMBIENT PRESSURE",           "Millibars",            SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT DENSITY",            "Slugs per cubic feet", SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT TEMPERATURE",        "Celsius",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT WIND DIRECTION",     "Degrees",              SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT WIND VELOCITY",      "Knots",                SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT WIND X",             "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT WIND Y",             "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "AMBIENT WIND Z",             "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
-	{ "TURN COORDINATOR BALL",             "Position 128",     SIMCONNECT_DATATYPE_WSTRING8 },
-	{ "TURB ENG N1:1",                     "Percent",     SIMCONNECT_DATATYPE_FLOAT64 },
-	{ "TURB ENG CORRECTED N1:1",           "Percent",     SIMCONNECT_DATATYPE_FLOAT64 },
-	{ "TURB ENG CORRECTED N1:2",           "Percent",     SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "TITLE",                             NULL,                   SIMCONNECT_DATATYPE_STRING256   },
+	{ "ABSOLUTE TIME",                     "Seconds",              SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "ZULU TIME",                         "Seconds",              SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "SIM TIME",                          "Seconds",              SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "ZULU DAY OF YEAR",                  "Number",               SIMCONNECT_DATATYPE_INT32       },
+	{ "ZULU YEAR",                         "Number",               SIMCONNECT_DATATYPE_INT32       },
+	{ "ZULU MONTH OF YEAR",                "Number",               SIMCONNECT_DATATYPE_INT32       },
+	{ "ZULU DAY OF MONTH",                 "Number",               SIMCONNECT_DATATYPE_INT32       },
+	{ "PLANE ALTITUDE",					   "Feet",                 SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "RADIO HEIGHT",					   "Feet",                 SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "GROUND VELOCITY",					   "Knots",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AIRSPEED TRUE",					   "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AIRSPEED MACH",			   "Mach",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AMBIENT WIND DIRECTION",            "Degrees",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AMBIENT WIND VELOCITY",             "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "VERTICAL SPEED",                    "Feet per second",      SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "AIRSPEED INDICATED",			   "Knots",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "PLANE PITCH DEGREES",               "Radians",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "PLANE BANK DEGREES",                "Radians",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "PLANE HEADING DEGREES TRUE",        "Radians",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AMBIENT PRESSURE",        "Millibars",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "PLANE LATITUDE",                    "Degrees",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "PLANE LONGITUDE",                   "Degrees",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "RUDDER DEFLECTION",				   "Radians",			   SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "AILERON LEFT DEFLECTION",           "Radians",			   SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "AILERON RIGHT DEFLECTION",          "Radians",			   SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "ELEVATOR DEFLECTION",			   "Radians",			   SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "FLAPS HANDLE PERCENT",			   "Percent over 100",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "SPOILERS LEFT POSITION",			   "Position",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "SPOILERS RIGHT POSITION",			   "Position",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "TOTAL WEIGHT",			   "Pounds",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "TURB ENG N1:2",                     "Percent",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "TURB ENG N1:1",                     "Percent",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "TURB ENG N2:2",                     "Percent",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "TURB ENG N2:1",                     "Percent",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "INCIDENCE ALPHA",                   "Radians",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "INCIDENCE BETA",					   "Radians",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "HSI DISTANCE",					   "Nautical miles",              SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "NAV GLIDE SLOPE ERROR:1",           "Degrees",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "NAV LOCALIZER:1",           "Degrees",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "YOKE Y POSITION",					"Position",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "YOKE X POSITION",					"Position",			   SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AMBIENT WIND X",                    "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "AMBIENT WIND Y",                    "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "AMBIENT WIND Z",                    "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64     },
+	{ "AIRCRAFT WIND X",                   "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AIRCRAFT WIND Y",                   "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "AIRCRAFT WIND Z",                   "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "VELOCITY WORLD Z",                  "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64	   },
+	{ "VELOCITY WORLD X",                  "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64	   },
+	{ "VELOCITY WORLD Y",                  "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64	   },
+	{ "VELOCITY WORLD X",                  "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "VELOCITY WORLD Y",                  "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
+	{ "VELOCITY WORLD Z",                  "Meters per second",    SIMCONNECT_DATATYPE_FLOAT64 },
 };
 
-
-
-
-
+double windPara[10];
 SOCKET socket1;
 struct sockaddr_in server;
 int len = sizeof(server);
@@ -254,13 +283,30 @@ void PrintHeader()
 		if (1 == i) continue;
 		if (5 == i) continue;
 		if (6 == i) continue;
+
 #else
 #endif
-
-		if (2 == i) 	strcat_s(szBuffer, sizeof(szBuffer), "ZULU UTC TIME");
-		if (7 == i)strcat_s(szBuffer, sizeof(szBuffer), "ZULU DATE");
-		else	strcat_s(szBuffer, sizeof(szBuffer), prop.pszName);
-
+		switch (i)
+		{
+		case 2:
+			strcat_s(szBuffer, sizeof(szBuffer), "ZULU UTC TIME");
+			break;
+		case 7:
+			strcat_s(szBuffer, sizeof(szBuffer), "ZULU DATE");
+			break;
+		case 51:
+			strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND X");
+			break;
+		case 52:
+			strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND Y");
+			break;
+		case 53:
+			strcat_s(szBuffer, sizeof(szBuffer), "DEFINED WIND Z");
+			break;
+		default:
+			strcat_s(szBuffer, sizeof(szBuffer), prop.pszName);
+			break;
+		}
 
 		if (prop.pszUnits)
 		{
@@ -294,7 +340,7 @@ void PrintString(char* pszBuffer, unsigned int cbBuffer, const char* pszValue, b
 			}
 			else
 			{
-				StringCchPrintfA(szTemp, sizeof(szTemp), ",", pszValue);
+				StringCchPrintfA(szTemp, sizeof(szTemp), ",");
 				strcat_s(pszBuffer, cbBuffer, szTemp);
 			}
 		}
@@ -307,7 +353,7 @@ void PrintString(char* pszBuffer, unsigned int cbBuffer, const char* pszValue, b
 			}
 			else
 			{
-				StringCchPrintfA(szTemp, sizeof(szTemp), "\n", pszValue);
+				StringCchPrintfA(szTemp, sizeof(szTemp), "\n");
 				strcat_s(pszBuffer, cbBuffer, szTemp);
 			}
 		}
@@ -351,19 +397,16 @@ void PrintDouble(char* pszBuffer, unsigned int cbBuffer, double dValue)
 	}
 }
 
-void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pContext)
+void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void* pContext)
 {
 	HRESULT hr;
-
-
-
-	SendData sd;
+	SendData sd{};
 
 	switch (pData->dwID)
 	{
 	case SIMCONNECT_RECV_ID_EVENT:
 	{
-		SIMCONNECT_RECV_EVENT *evt = (SIMCONNECT_RECV_EVENT*)pData;
+		SIMCONNECT_RECV_EVENT* evt = (SIMCONNECT_RECV_EVENT*)pData;
 
 		switch (evt->uEventID)
 		{
@@ -373,7 +416,7 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 
 			//InitWinsock();
 			WSADATA wsaData;
-			int iErrorCode;
+			//int iErrorCode;
 			if (WSAStartup(MAKEWORD(2, 1), &wsaData)) //调用Windows Sockets DLL
 			{
 				printf("Winsock无法初始化!\n");
@@ -404,12 +447,14 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 			time_t t = time(NULL);
 			struct tm* pTM = localtime(&t);
 
-			sprintf_s(szFileName, 1024, "%04d_%02d_%02d_%02d_%02d_%02drecord.csv", pTM->tm_year + 1900, pTM->tm_mon + 1, pTM->tm_mday, pTM->tm_hour, pTM->tm_min, pTM->tm_sec);
+			sprintf_s(szFileName, 1024, "%04d_%02d_%02d_%02d_%02d_%02drecord.csv", pTM->tm_year + 1900, \
+				pTM->tm_mon + 1, pTM->tm_mday, pTM->tm_hour, pTM->tm_min, pTM->tm_sec);
 
 			fopen_s(&g_pFile, szFileName, "w+");
 			if (!g_pFile)
 			{
-				printf("Failed to open \"%s\". Please ensure the file has the correct permissions and is not being used by another application.", szFileName);
+				printf("Failed to open \"%s\". Please ensure the file has the correct permissions and "\
+					"is not being used by another application.", szFileName);
 				break;
 			}
 			printf("\nFile successfully opened!");
@@ -419,7 +464,8 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 			PrintHeader();
 
 			// Per frame data request on the user object.
-			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT, SIMCONNECT_OBJECT_ID_USER, SIMCONNECT_PERIOD_VISUAL_FRAME);
+			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT, \
+				SIMCONNECT_OBJECT_ID_USER, SIMCONNECT_PERIOD_VISUAL_FRAME);
 
 			// Update menu items.
 			hr = SimConnect_MenuDeleteItem(g_hSimConnect, EVENT_ID_START_HARVEST);
@@ -430,7 +476,8 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 		case EVENT_ID_STOP_HARVEST:
 		{
 			// Cancel the data request on the user object.
-			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT, SIMCONNECT_OBJECT_ID_USER, SIMCONNECT_PERIOD_NEVER);
+			hr = SimConnect_RequestDataOnSimObject(g_hSimConnect, REQUEST_ID_USER_OBJECT_DATA, DEFINITION_ID_USER_OBJECT, \
+				SIMCONNECT_OBJECT_ID_USER, SIMCONNECT_PERIOD_NEVER);
 
 			// Update menu items.
 			hr = SimConnect_MenuDeleteItem(g_hSimConnect, EVENT_ID_STOP_HARVEST);
@@ -438,7 +485,7 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 
 			sd = { 1,1000,1,1000 };
 
-			char *buffer = new char[sizeof(SendData)];
+			char* buffer = new char[sizeof(SendData)];
 
 			memcpy(buffer, &sd, sizeof(SendData));
 
@@ -492,29 +539,46 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 
 			if (SUCCEEDED(StringCbLengthA(&pUserData->szTitle[0], sizeof(pUserData->szTitle), NULL))) // security check
 			{
+				windPara[0] = pUserData->dPitch;
+				windPara[1] = pUserData->dBank;
+				windPara[2] = pUserData->dHeading;
+				windPara[3] = pUserData->dAlpha;
+				windPara[4] = pUserData->dBeta;
+				windPara[5] = pUserData->dAirspeed;
+				windPara[6] = pUserData->dwvelocityz;
+				windPara[7] = pUserData->dwvelocityx;
+				windPara[8] = pUserData->dwvelocityy;
+#if OUTPUT_WAY 
 				setColour(2);
-				printf("\nDataHarvesting: SimTime=%f",
-					pUserData->dSimTime);
+				printf("\n %.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f",
+					pUserData->dwvelocityz,
+					pUserData->dwvelocityx,
+					pUserData->dwvelocityy,
+					pUserData->dWindX,
+					pUserData->dWindY,
+					pUserData->dWindZ,
+					dev_windX,
+					dev_windY,
+					dev_windZ
+				);
+#else
+#endif
 			}
 
-			sd.pitch_v = pUserData->dR_VelocityX * 30.0f / 3.1415926f * 100;
-			sd.pitch_acc = pUserData->dR_AccelerationX * 2 * 3.1415926f * 100;
-			sd.roll_v = pUserData->dR_VelocityY * 30.0f / 3.1415926f * 100;
-			sd.roll_acc = pUserData->dR_AccelerationY * 2 * 3.1415926f * 100;
-			sd.verticalSpeed = pUserData->dR_VelocityZ * 60;
+			sd.pitch_acc = 0;
+			sd.pitch_v = 0;
+			sd.roll_acc = 0;
+			sd.roll_v = 0;
 
-			char *buffer = new char[sizeof(SendData)];
+			char* buffer = new char[sizeof(SendData)];
 
 			memcpy(buffer, &sd, sizeof(SendData));
 
-
 			if (socket1 != NULL && sendto(socket1, buffer, sizeof(SendData), 0, (struct sockaddr*)&server, len) != SOCKET_ERROR)
 			{
-
-				printf("sending..\n");
-
+				printf("   sending..\n");
 			}
-			delete buffer;
+			delete[]buffer;
 
 			if (g_pFile != NULL)
 			{
@@ -526,7 +590,7 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 				{
 					tCurSec = t;
 					nLastMS = 0;
-				}
+		}
 
 				if ((nMS - nLastMS) > nTimeOutMS)
 				{
@@ -539,8 +603,6 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 #else
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAbsoluteTime);
 #endif
-
-
 #if USE_NEW_TIME
 					GetTimeStr(szBuffer, sizeof(szBuffer), pUserData->dTime);
 #else
@@ -555,67 +617,69 @@ void CALLBACK MyDispatchProcRD(SIMCONNECT_RECV* pData, DWORD cbData, void *pCont
 					PrintInt(szBuffer, sizeof(szBuffer), pUserData->uMonthOfTheYear);
 					PrintInt(szBuffer, sizeof(szBuffer), pUserData->uDayOfTheMonth);
 #endif
-
-					PrintInt(szBuffer, sizeof(szBuffer), pUserData->uDayOfTheWeek);
-					PrintInt(szBuffer, sizeof(szBuffer), pUserData->uTimeZoneOffset);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dHeight);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dRHeight);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dGSpeed);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAirspeed);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dMach);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindDirection);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindVelocity);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dVerSpeed);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dIndSpeed);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dPitch* (-57.2957804));
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dBank * 57.2957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dHeading * 57.2957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dPressure);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dLatitude);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dLongitude);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dR_VelocityX);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dR_VelocityY);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dR_VelocityZ);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dPitch*(-57.2957804));
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dBank*57.2957804);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dHeading*57.5957804);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dVerSpeed*60);
-					/*PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dVelocityY);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dVelocityZ);*/
-					/*	PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAccelerationX);
-						PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAccelerationY);
-						PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAccelerationZ);*/
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dR_AccelerationX);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dR_AccelerationY);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dR_AccelerationZ);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAlpha*57.2957804);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dBeta*57.2957804);
-					PrintDouble(szBuffer, sizeof(szBuffer), (pUserData->dAirspeed));
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dHeight);
-
-					/*PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWeight);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dThrust);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAileron_def);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dElevator_def);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dRudder_def);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dE_weight);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dCG);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dL_CG);*/
-					/*PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dDynaminPressure);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWingArea);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWingSpan);*/
-					/*PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dBetaDot);*/
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAirPressure);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAirDensity);
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dTemperature);
-					PrintDouble(szBuffer, sizeof(szBuffer), (pUserData->dWindDirection + 1.0));
-					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindVelocity);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dRudder_def * 57.2957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAileron_left * 57.2957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAileron_right * 57.2957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dElevator_def * 57.2957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dFlapHandle);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dSpoilL);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dSpoilR);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWeight);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn1_1);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn1_2);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn2_2);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dn2_1);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAlpha * 57.5957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dBeta * 57.5957804);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dHDistance);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dGlideSlope);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dLoc);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dYokeY);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dYokeX);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindX);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindY);
 					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dWindZ);
-					PrintInt(szBuffer, sizeof(szBuffer), pUserData->ball);
-					PrintInt(szBuffer, sizeof(szBuffer), pUserData->dengineN1);
-					PrintInt(szBuffer, sizeof(szBuffer), pUserData->dcorrectedengineN11);
-					PrintInt(szBuffer, sizeof(szBuffer), pUserData->correctedengineN12);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAirwindx);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAirwindy);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dAirwindz);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dwvelocityx);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dwvelocityy);
+					PrintDouble(szBuffer, sizeof(szBuffer), pUserData->dwvelocityz);
+					GetWindX(szBuffer, sizeof(szBuffer), windPara[0], windPara[1], windPara[2],
+						windPara[3], windPara[4], windPara[5], windPara[6]);
+					GetWindY(szBuffer, sizeof(szBuffer), windPara[0], windPara[1], windPara[2],
+						windPara[3], windPara[4], windPara[5], windPara[7]);
+					GetWindZ(szBuffer, sizeof(szBuffer), windPara[0], windPara[1], windPara[2],
+						windPara[3], windPara[4], windPara[5], windPara[8]);
+
+
 					strcat_s(szBuffer, sizeof(szBuffer), "\n");
 					fprintf_s(g_pFile, szBuffer);
-				}
-			}
+		}
+	}
 
 			break;
-		}
+	}
 		default:
 		{
 			break;
 		}
-		}
+}
 
 		break; // SIMCONNECT_RECV_ID_SIMOBJECT_DATA
 	}
@@ -702,20 +766,15 @@ void RunDataHarvester()
 		printf("\nConnection timeout!");
 	}
 }
-#include<conio.h>
+
 int __cdecl _tmain(int argc, _TCHAR* argv[])
 {
 	printf("input count per second:");
-	scanf("%d", &nCount1Sec);
-	if (0 >= nCount1Sec)
-	{
-		return 0;
-	}
-	if (nCount1Sec > 6)
-	{
-		nCount1Sec += 3;
-	}
+	int r = scanf("%d", &nCount1Sec);
+	if (0 >= nCount1Sec)return 0;
+	if (nCount1Sec > 6)nCount1Sec += 3;
 	nTimeOutMS = (int)(1000. / nCount1Sec);
+
 	RunDataHarvester();
 	return 0;
 }

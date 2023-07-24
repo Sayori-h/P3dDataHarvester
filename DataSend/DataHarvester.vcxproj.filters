@@ -44,7 +44,7 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DataHarvester(new)(2).cpp">
+    <ClCompile Include="DataHarvester.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
